@@ -60,6 +60,12 @@ def delete_set(session_id: int, set_id: int, db: Session = Depends(get_db)):
     session_service.delete_set(db, session_id, set_id)
 
 
+@router.delete("/{session_id}", status_code=204)
+def cancel_session(session_id: int, db: Session = Depends(get_db)):
+    """Cancel (delete) an unfinished session."""
+    session_service.cancel_session(db, session_id)
+
+
 @router.put("/{session_id}/sets/{set_id}", response_model=SetRead)
 def update_set(session_id: int, set_id: int, data: SetUpdate, db: Session = Depends(get_db)):
     return session_service.update_set(db, session_id, set_id, data)

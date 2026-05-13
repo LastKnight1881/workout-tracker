@@ -2,7 +2,7 @@
 
 import {
   getActiveRoutine, getRoutine, startSession, getSession, getSessionPlan,
-  logSet, finishSession, getLastSets
+  logSet, finishSession, cancelSession, getLastSets
 } from '../api.js';
 import { formatWeight, parseWeight, formatDuration, showToast, openModal, closeModal } from '../utils.js';
 import { RestTimer, playDoneBeeps } from '../services/timer.js';
@@ -11,11 +11,12 @@ import { setActiveSession, getActiveSession, setState } from '../app.js';
 let _elapsedTimer = null;
 let _restTimer = null;
 let _sessionId = null;
-let _startedAt = null;
+let _startedAt = null;       // set when Begin is clicked, not when session created
 let _prefs = null;
-let _paused = false;       // true while workout is paused
-let _pausedAt = null;      // Date when last paused
-let _pausedElapsed = 0;    // accumulated elapsed ms before current pause
+let _paused = false;
+let _pausedAt = null;
+let _pausedElapsed = 0;
+let _pendingSession = null;  // session created but Begin not yet clicked: { id, plan }
 
 export async function init(container, state) {
   _prefs = state.prefs;
@@ -24,10 +25,16 @@ export async function init(container, state) {
   const hash = window.location.hash.replace('#', '');
   const params = parseHashParams(hash);
 
-  // If there's an active session in state, resume it
+  // Active session = Begin was already clicked — resume mid-workout
   const active = getActiveSession();
   if (active) {
     await resumeSession(container, active);
+    return cleanup;
+  }
+
+  // Pending session = day was picked but Begin not yet clicked — restore Ready screen
+  if (_pendingSession) {
+    renderReadyScreen(container, _pendingSession.plan);
     return cleanup;
   }
 
@@ -35,10 +42,8 @@ export async function init(container, state) {
   const routineId = params.routine ? parseInt(params.routine) : null;
 
   if (dayId && routineId) {
-    // Start directly
     await startAndRender(container, dayId, routineId);
   } else {
-    // Show day picker
     await renderDayPicker(container);
   }
 
@@ -52,6 +57,8 @@ function cleanup() {
   _paused = false;
   _pausedAt = null;
   _pausedElapsed = 0;
+  _pendingSession = null;
+  window._sessionActive = false;
 }
 
 // ─── Day Picker ───────────────────────────────────────────────────────────────
@@ -99,9 +106,10 @@ async function startAndRender(container, dayId, routineId) {
   try {
     const sess = await startSession(dayId, routineId);
     _sessionId = sess.id;
-    _startedAt = null;  // not started until Begin is hit
-    setActiveSession({ session_id: sess.id, started_at: sess.started_at, day_id: dayId, routine_id: routineId });
+    _startedAt = null;  // not started until Begin is clicked
     const plan = await getSessionPlan(sess.id);
+    // Store as pending — do NOT call setActiveSession yet
+    _pendingSession = { id: sess.id, plan };
     renderReadyScreen(container, plan);
   } catch (e) {
     container.innerHTML = `<div class="empty-state"><h2>Error</h2><p>${e.message}</p></div>`;
@@ -116,20 +124,31 @@ function renderReadyScreen(container, plan) {
       <div class="ready-day-name">Day ${plan.day_number || ''}: ${esc(plan.day_name || '')}</div>
       <div class="ready-meta">${exCount} exercise${exCount !== 1 ? 's' : ''}</div>
       <button class="btn btn-primary btn-lg" id="begin-btn">▶ Begin Workout</button>
+      <button class="btn btn-ghost btn-sm" id="cancel-ready-btn">✕ Cancel</button>
     </div>
   `;
   container.querySelector('#begin-btn').addEventListener('click', async () => {
     _startedAt = new Date();
     _pausedElapsed = 0;
+    _pendingSession = null;
+    // NOW mark session as active so resume works if user navigates away mid-workout
+    setActiveSession({
+      session_id: _sessionId,
+      started_at: _startedAt.toISOString(),
+      day_id: plan.day_id,
+    });
     await renderActiveSession(container, plan);
   });
+  container.querySelector('#cancel-ready-btn').addEventListener('click', () => cancelWorkout(container, plan.session_id, true));
 }
 
 async function resumeSession(container, active) {
   container.innerHTML = '<div class="spinner"></div>';
   try {
     _sessionId = active.session_id;
+    // started_at is the Begin-click time stored in setActiveSession
     _startedAt = new Date(active.started_at);
+    _pausedElapsed = active.paused_elapsed_ms || 0;
     const plan = await getSessionPlan(active.session_id);
     if (plan.finished_at) {
       setActiveSession(null);
@@ -140,6 +159,24 @@ async function resumeSession(container, active) {
   } catch (e) {
     container.innerHTML = `<div class="empty-state"><h2>Error</h2><p>${e.message}</p></div>`;
   }
+}
+
+// ─── Cancel Workout ───────────────────────────────────────────────────────────
+async function cancelWorkout(container, sessionId, silent) {
+  const msg = silent
+    ? 'Cancel this workout? No sets have been logged yet.'
+    : 'Cancel workout? All logged sets will be deleted and this session will be removed.';
+  if (!confirm(msg)) return;
+  try {
+    await cancelSession(sessionId);
+  } catch (e) {
+    // If already gone, ignore
+  }
+  cleanup();
+  setActiveSession(null);
+  _sessionId = null;
+  showToast('Workout cancelled', 'info');
+  await renderDayPicker(container);
 }
 
 // ─── Active Session Render ────────────────────────────────────────────────────
@@ -168,6 +205,7 @@ async function renderActiveSession(container, plan) {
     </div>
     <div class="finish-bar">
       <button class="btn btn-danger btn-block" id="finish-btn">Finish Workout</button>
+      <button class="btn btn-ghost btn-sm btn-block" id="cancel-active-btn" style="margin-top:8px">✕ Cancel Workout</button>
     </div>
   `;
 
@@ -184,6 +222,9 @@ async function renderActiveSession(container, plan) {
   // Finish button
   container.querySelector('#finish-btn').addEventListener('click', () => showFinishModal(plan.session_id));
 
+  // Cancel button
+  container.querySelector('#cancel-active-btn').addEventListener('click', () => cancelWorkout(container, plan.session_id, false));
+
   // Warn on navigate away
   window._sessionActive = true;
 }
@@ -191,11 +232,11 @@ async function renderActiveSession(container, plan) {
 function startElapsedTimer() {
   if (_elapsedTimer) clearInterval(_elapsedTimer);
   _elapsedTimer = setInterval(() => {
-    if (_paused) return;
+    if (_paused || !_startedAt) return;
     const el = document.getElementById('session-elapsed');
-    if (el && _startedAt) {
+    if (el) {
       const secs = Math.floor((_pausedElapsed + Date.now() - _startedAt.getTime()) / 1000);
-      el.textContent = formatDuration(secs);
+      el.textContent = formatDuration(Math.max(0, secs));
     }
   }, 1000);
 }
@@ -203,9 +244,15 @@ function startElapsedTimer() {
 function pauseWorkout(container) {
   if (_paused) return;
   _paused = true;
-  _pausedElapsed += Date.now() - (_startedAt?.getTime() || Date.now());
-  _startedAt = null;
+  // Accumulate elapsed up to this moment
+  if (_startedAt) {
+    _pausedElapsed += Date.now() - _startedAt.getTime();
+    _startedAt = null;
+  }
   if (_restTimer) { _restTimer.destroy(); _restTimer = null; }
+  // Persist paused_elapsed_ms so resume-after-nav works
+  const active = getActiveSession();
+  if (active) setActiveSession({ ...active, paused_elapsed_ms: _pausedElapsed });
   const overlay = document.getElementById('paused-overlay');
   if (overlay) overlay.style.display = 'flex';
   const pauseBtn = document.getElementById('pause-btn');
@@ -216,6 +263,9 @@ function resumeWorkout(container) {
   if (!_paused) return;
   _paused = false;
   _startedAt = new Date();
+  // Update stored started_at so resume-after-nav recalculates correctly
+  const active = getActiveSession();
+  if (active) setActiveSession({ ...active, started_at: _startedAt.toISOString(), paused_elapsed_ms: _pausedElapsed });
   const overlay = document.getElementById('paused-overlay');
   if (overlay) overlay.style.display = 'none';
   const pauseBtn = document.getElementById('pause-btn');

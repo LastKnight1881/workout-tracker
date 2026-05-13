@@ -58,6 +58,7 @@ export function getSession(id) { return request('GET', `/api/sessions/${id}`); }
 export function getSessionPlan(id) { return request('GET', `/api/sessions/${id}/plan`); }
 export function updateSession(id, data) { return request('PUT', `/api/sessions/${id}`, data); }
 export function finishSession(id, data) { return request('POST', `/api/sessions/${id}/finish`, data); }
+export function cancelSession(id) { return request('DELETE', `/api/sessions/${id}`); }
 export function logSet(sessionId, data) { return request('POST', `/api/sessions/${sessionId}/sets`, data); }
 export function deleteSet(sessionId, setId) { return request('DELETE', `/api/sessions/${sessionId}/sets/${setId}`); }
 export function updateSet(sessionId, setId, data) { return request('PUT', `/api/sessions/${sessionId}/sets/${setId}`, data); }

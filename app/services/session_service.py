@@ -210,6 +210,19 @@ def delete_set(db: Session, session_id: int, set_id: int) -> None:
     db.commit()
 
 
+def cancel_session(db: Session, session_id: int) -> None:
+    """Delete an in-progress session and all its sets (cancel before finishing)."""
+    sess = db.query(WorkoutSession).filter(WorkoutSession.id == session_id).first()
+    if not sess:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if sess.finished_at is not None:
+        raise HTTPException(status_code=400, detail="Cannot cancel a finished session")
+    # Cascade delete sets then session
+    db.query(SessionSet).filter(SessionSet.session_id == session_id).delete()
+    db.delete(sess)
+    db.commit()
+
+
 def update_set(db: Session, session_id: int, set_id: int, data: SetUpdate) -> SessionSet:
     """Update a set within a session."""
     s = db.query(SessionSet).filter(SessionSet.id == set_id, SessionSet.session_id == session_id).first()
