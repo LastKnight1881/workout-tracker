@@ -205,7 +205,7 @@ async function renderActiveSession(container, plan) {
     </div>
     <div class="finish-bar">
       <button class="btn btn-danger btn-block" id="finish-btn">Finish Workout</button>
-      <button class="btn btn-cancel btn-sm btn-block" id="cancel-active-btn" style="margin-top:8px">✕ Cancel Workout</button>
+      <button class="btn btn-cancel btn-block" id="cancel-active-btn" style="margin-top:8px">✕ Cancel Workout</button>
     </div>
   `;
 
