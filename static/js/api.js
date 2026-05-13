@@ -68,11 +68,17 @@ export function getLastSets(exerciseId) { return request('GET', `/api/sessions/e
 export function getPRs(exerciseId, limit = 10) {
   return request('GET', `/api/progress/prs?exercise_id=${exerciseId}&limit=${limit}`);
 }
-export function getVolume(exerciseId, weeks = 12) {
-  return request('GET', `/api/progress/volume?exercise_id=${exerciseId}&weeks=${weeks}`);
+export function getVolume(exerciseId, weeks = 12, dateFrom = null, dateTo = null) {
+  let url = `/api/progress/volume?exercise_id=${exerciseId}&weeks=${weeks}`;
+  if (dateFrom) url += `&date_from=${dateFrom}`;
+  if (dateTo)   url += `&date_to=${dateTo}`;
+  return request('GET', url);
 }
-export function getExerciseProgress(exerciseId, limit = 30) {
-  return request('GET', `/api/progress/exercises/${exerciseId}?limit=${limit}`);
+export function getExerciseProgress(exerciseId, limit = 30, dateFrom = null, dateTo = null) {
+  let url = `/api/progress/exercises/${exerciseId}?limit=${limit}`;
+  if (dateFrom) url += `&date_from=${dateFrom}`;
+  if (dateTo)   url += `&date_to=${dateTo}`;
+  return request('GET', url);
 }
 export function getSuggestions() { return request('GET', '/api/progress/suggestions'); }
 

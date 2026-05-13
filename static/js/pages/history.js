@@ -146,56 +146,108 @@ function renderDetail(session) {
 }
 
 // ─── Progress Charts ──────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+function daysAgoStr(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10);
+}
+
+// ─── Charts Tab ───────────────────────────────────────────────────────────────
 async function renderCharts(content) {
   content.innerHTML = '<div class="spinner"></div>';
   try {
-    // Load exercise list for the picker
     const exercises = await getExercises();
     const sorted = [...exercises].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
+    const defaultFrom = daysAgoStr(90);
+    const defaultTo   = todayStr();
+
     content.innerHTML = `
       <div class="charts-controls">
-        <label class="form-label">Exercise</label>
-        <select id="chart-exercise-picker" class="form-control">
-          ${sorted.map(e => `<option value="${e.id}">${esc(e.name)}</option>`).join('')}
-        </select>
+        <div class="charts-controls-row">
+          <div class="form-group" style="flex:2;min-width:180px">
+            <label class="form-label">Exercise</label>
+            <select id="chart-exercise-picker" class="form-control">
+              ${sorted.map(e => `<option value="${e.id}">${esc(e.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group" style="flex:1;min-width:130px">
+            <label class="form-label">From</label>
+            <input type="date" id="chart-date-from" class="form-control" value="${defaultFrom}">
+          </div>
+          <div class="form-group" style="flex:1;min-width:130px">
+            <label class="form-label">To</label>
+            <input type="date" id="chart-date-to" class="form-control" value="${defaultTo}">
+          </div>
+        </div>
+        <div class="charts-presets">
+          <button class="btn btn-sm btn-ghost preset-btn" data-days="30">30d</button>
+          <button class="btn btn-sm btn-ghost preset-btn" data-days="90">3mo</button>
+          <button class="btn btn-sm btn-ghost preset-btn" data-days="180">6mo</button>
+          <button class="btn btn-sm btn-ghost preset-btn" data-days="365">1yr</button>
+          <button class="btn btn-sm btn-ghost preset-btn" data-days="0">All</button>
+        </div>
       </div>
-      <div id="charts-area">
-        <div class="spinner"></div>
-      </div>
+      <div id="charts-area"><div class="spinner"></div></div>
     `;
 
-    const picker = content.querySelector('#chart-exercise-picker');
+    const picker   = content.querySelector('#chart-exercise-picker');
+    const fromInput = content.querySelector('#chart-date-from');
+    const toInput   = content.querySelector('#chart-date-to');
+
     const loadCharts = async () => {
       const exId = parseInt(picker.value);
-      await renderExerciseCharts(exId, content.querySelector('#charts-area'));
+      const from = fromInput.value || null;
+      const to   = toInput.value   || null;
+      await renderExerciseCharts(exId, content.querySelector('#charts-area'), from, to);
     };
 
     picker.addEventListener('change', loadCharts);
+    fromInput.addEventListener('change', loadCharts);
+    toInput.addEventListener('change', loadCharts);
+
+    content.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const days = parseInt(btn.dataset.days);
+        toInput.value   = todayStr();
+        fromInput.value = days === 0 ? '2000-01-01' : daysAgoStr(days);
+        // Highlight active preset
+        content.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        loadCharts();
+      });
+    });
+
+    // Default: highlight 3mo
+    content.querySelector('[data-days="90"]').classList.add('active');
     await loadCharts();
   } catch (e) {
     content.innerHTML = `<div class="empty-state"><h2>Error</h2><p>${e.message}</p></div>`;
   }
 }
 
-async function renderExerciseCharts(exerciseId, area) {
+async function renderExerciseCharts(exerciseId, area, dateFrom, dateTo) {
   area.innerHTML = '<div class="spinner"></div>';
   _destroyCharts();
 
   try {
     const [progress, volume] = await Promise.all([
-      getExerciseProgress(exerciseId, 30),
-      getVolume(exerciseId, 16),
+      getExerciseProgress(exerciseId, 500, dateFrom, dateTo),
+      getVolume(exerciseId, 365, dateFrom, dateTo),
     ]);
 
     if (!progress.length) {
-      area.innerHTML = '<p class="empty-state" style="padding:24px">No data logged for this exercise yet.</p>';
+      area.innerHTML = '<p class="empty-state" style="padding:24px">No data logged for this exercise in this date range.</p>';
       return;
     }
 
-    // Reverse so chronological (oldest first)
-    const prog = [...progress].reverse();
-    const vol = [...volume].reverse();
+    // Already chronological (asc) from backend
+    const prog = progress;
+    const vol  = volume;
 
     area.innerHTML = `
       <div class="chart-card">
@@ -207,7 +259,7 @@ async function renderExerciseCharts(exerciseId, area) {
         <canvas id="chart-1rm" height="180"></canvas>
       </div>
       <div class="chart-card">
-        <div class="chart-title">Weekly Volume (lbs)</div>
+        <div class="chart-title">Volume Per Session (lbs)</div>
         <canvas id="chart-volume" height="180"></canvas>
       </div>
     `;
@@ -216,12 +268,11 @@ async function renderExerciseCharts(exerciseId, area) {
       responsive: true,
       plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { color: '#aaa', maxTicksLimit: 8 }, grid: { color: '#333' } },
+        x: { ticks: { color: '#aaa', maxTicksLimit: 10 }, grid: { color: '#333' } },
         y: { ticks: { color: '#aaa' }, grid: { color: '#333' } },
       },
     };
 
-    // Weight chart
     _chartInstances.push(new Chart(document.getElementById('chart-weight'), {
       type: 'line',
       data: {
@@ -230,15 +281,12 @@ async function renderExerciseCharts(exerciseId, area) {
           data: prog.map(p => p.weight),
           borderColor: '#4f8ef7',
           backgroundColor: 'rgba(79,142,247,0.12)',
-          fill: true,
-          tension: 0.3,
-          pointRadius: 4,
+          fill: true, tension: 0.3, pointRadius: 3,
         }],
       },
       options: chartDefaults,
     }));
 
-    // Estimated 1RM chart
     _chartInstances.push(new Chart(document.getElementById('chart-1rm'), {
       type: 'line',
       data: {
@@ -247,16 +295,12 @@ async function renderExerciseCharts(exerciseId, area) {
           data: prog.map(p => p.estimated_1rm ? Math.round(p.estimated_1rm) : null),
           borderColor: '#f7a74f',
           backgroundColor: 'rgba(247,167,79,0.12)',
-          fill: true,
-          tension: 0.3,
-          pointRadius: 4,
-          spanGaps: true,
+          fill: true, tension: 0.3, pointRadius: 3, spanGaps: true,
         }],
       },
       options: chartDefaults,
     }));
 
-    // Weekly volume chart
     if (vol.length) {
       _chartInstances.push(new Chart(document.getElementById('chart-volume'), {
         type: 'bar',
@@ -273,7 +317,7 @@ async function renderExerciseCharts(exerciseId, area) {
       }));
     } else {
       document.getElementById('chart-volume').closest('.chart-card').innerHTML =
-        '<p style="color:var(--text-secondary);padding:12px">No volume data.</p>';
+        '<p style="color:var(--text-secondary);padding:12px">No volume data in range.</p>';
     }
 
   } catch (e) {

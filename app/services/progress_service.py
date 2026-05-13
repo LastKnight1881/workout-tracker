@@ -40,9 +40,9 @@ def get_prs(db: Session, limit: int = 20) -> List[PREntry]:
     ]
 
 
-def get_volume_history(db: Session, days: int = 30) -> List[VolumeEntry]:
-    """Total volume (weight * reps) per workout day over last N days."""
-    rows = (
+def get_volume_history(db: Session, days: int = 30, date_from: Optional[str] = None, date_to: Optional[str] = None) -> List[VolumeEntry]:
+    """Total volume (weight * reps) per workout day. Supports date range or rolling N days."""
+    q = (
         db.query(
             func.date(WorkoutSession.started_at).label("date"),
             func.sum(SessionSet.weight * SessionSet.reps).label("volume"),
@@ -53,24 +53,36 @@ def get_volume_history(db: Session, days: int = 30) -> List[VolumeEntry]:
             SessionSet.weight.isnot(None),
             SessionSet.is_warmup == 0,
         )
-        .group_by(func.date(WorkoutSession.started_at))
-        .order_by(func.date(WorkoutSession.started_at).desc())
-        .limit(days)
+    )
+    if date_from:
+        q = q.filter(func.date(WorkoutSession.started_at) >= date_from)
+    if date_to:
+        q = q.filter(func.date(WorkoutSession.started_at) <= date_to)
+    rows = (
+        q.group_by(func.date(WorkoutSession.started_at))
+        .order_by(func.date(WorkoutSession.started_at).asc())
+        .limit(days if not (date_from or date_to) else 3650)
         .all()
     )
     return [VolumeEntry(date=r.date, total_volume_lbs=round(r.volume or 0, 1)) for r in rows]
 
 
-def get_exercise_progress(db: Session, exercise_id: int, limit: int = 50) -> List[ProgressPoint]:
+def get_exercise_progress(db: Session, exercise_id: int, limit: int = 50, date_from: Optional[str] = None, date_to: Optional[str] = None) -> List[ProgressPoint]:
     """Best set per session for an exercise (heaviest weight, tiebreak: most reps). Returns estimated 1RM."""
     # Get all sessions that had this exercise
-    sessions = (
+    q = (
         db.query(WorkoutSession.id, WorkoutSession.started_at)
         .join(SessionSet, SessionSet.session_id == WorkoutSession.id)
         .filter(SessionSet.exercise_id == exercise_id, WorkoutSession.finished_at.isnot(None))
         .distinct()
-        .order_by(WorkoutSession.started_at.desc(), WorkoutSession.id.desc())
-        .limit(limit)
+    )
+    if date_from:
+        q = q.filter(func.date(WorkoutSession.started_at) >= date_from)
+    if date_to:
+        q = q.filter(func.date(WorkoutSession.started_at) <= date_to)
+    sessions = (
+        q.order_by(WorkoutSession.started_at.asc(), WorkoutSession.id.asc())
+        .limit(limit if not (date_from or date_to) else 3650)
         .all()
     )
     result = []

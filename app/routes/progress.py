@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -15,13 +15,24 @@ def get_prs(limit: int = Query(20, ge=1, le=100), db: Session = Depends(get_db))
 
 
 @router.get("/volume", response_model=List[VolumeEntry])
-def get_volume(days: int = Query(30, ge=1, le=365), db: Session = Depends(get_db)):
-    return progress_service.get_volume_history(db, days=days)
+def get_volume(
+    days: int = Query(30, ge=1, le=365),
+    date_from: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    date_to: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    return progress_service.get_volume_history(db, days=days, date_from=date_from, date_to=date_to)
 
 
 @router.get("/exercises/{exercise_id}", response_model=List[ProgressPoint])
-def get_exercise_progress(exercise_id: int, limit: int = Query(50, ge=1, le=200), db: Session = Depends(get_db)):
-    return progress_service.get_exercise_progress(db, exercise_id, limit=limit)
+def get_exercise_progress(
+    exercise_id: int,
+    limit: int = Query(50, ge=1, le=500),
+    date_from: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    date_to: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    return progress_service.get_exercise_progress(db, exercise_id, limit=limit, date_from=date_from, date_to=date_to)
 
 
 @router.get("/overload/{day_id}", response_model=List[OverloadSuggestion])
