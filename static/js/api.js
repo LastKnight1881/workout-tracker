@@ -70,6 +70,9 @@ export function getPRs(exerciseId, limit = 10) {
 export function getVolume(exerciseId, weeks = 12) {
   return request('GET', `/api/progress/volume?exercise_id=${exerciseId}&weeks=${weeks}`);
 }
+export function getExerciseProgress(exerciseId, limit = 30) {
+  return request('GET', `/api/progress/exercises/${exerciseId}?limit=${limit}`);
+}
 export function getSuggestions() { return request('GET', '/api/progress/suggestions'); }
 
 // ─── Preferences ─────────────────────────────────────────────────────────────

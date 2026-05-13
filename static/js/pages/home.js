@@ -29,10 +29,11 @@ function renderHome(routine, sessions, prefs) {
       <div class="home-routine-box">
         <div class="home-routine-name">${esc(routine.name)}</div>
         <div class="home-day-cycle">${totalDays}-day cycle</div>
-        <div style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap">
+        <div class="home-day-grid">
           ${days.map(d => `
-            <a href="#session?day=${d.id}&routine=${routine.id}" class="btn btn-primary" style="flex:1;min-width:120px;">
-              Day ${d.day_number}: ${esc(d.name)}
+            <a href="#session?day=${d.id}&routine=${routine.id}" class="btn btn-primary home-day-btn">
+              <span class="day-num">Day ${d.day_number}</span>
+              <span class="day-label">${esc(d.name)}</span>
             </a>
           `).join('')}
         </div>

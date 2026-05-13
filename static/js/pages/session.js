@@ -13,6 +13,9 @@ let _restTimer = null;
 let _sessionId = null;
 let _startedAt = null;
 let _prefs = null;
+let _paused = false;       // true while workout is paused
+let _pausedAt = null;      // Date when last paused
+let _pausedElapsed = 0;    // accumulated elapsed ms before current pause
 
 export async function init(container, state) {
   _prefs = state.prefs;
@@ -46,6 +49,9 @@ function cleanup() {
   if (_elapsedTimer) { clearInterval(_elapsedTimer); _elapsedTimer = null; }
   if (_restTimer) { _restTimer.destroy(); _restTimer = null; }
   hideRestTimer();
+  _paused = false;
+  _pausedAt = null;
+  _pausedElapsed = 0;
 }
 
 // ─── Day Picker ───────────────────────────────────────────────────────────────
@@ -93,14 +99,30 @@ async function startAndRender(container, dayId, routineId) {
   try {
     const sess = await startSession(dayId, routineId);
     _sessionId = sess.id;
-    _startedAt = new Date(sess.started_at);
+    _startedAt = null;  // not started until Begin is hit
     setActiveSession({ session_id: sess.id, started_at: sess.started_at, day_id: dayId, routine_id: routineId });
     const plan = await getSessionPlan(sess.id);
-    await renderActiveSession(container, plan);
+    renderReadyScreen(container, plan);
   } catch (e) {
     container.innerHTML = `<div class="empty-state"><h2>Error</h2><p>${e.message}</p></div>`;
     showToast(e.message, 'error');
   }
+}
+
+function renderReadyScreen(container, plan) {
+  const exCount = (plan.exercises || []).length;
+  container.innerHTML = `
+    <div class="ready-screen">
+      <div class="ready-day-name">Day ${plan.day_number || ''}: ${esc(plan.day_name || '')}</div>
+      <div class="ready-meta">${exCount} exercise${exCount !== 1 ? 's' : ''}</div>
+      <button class="btn btn-primary btn-lg" id="begin-btn">▶ Begin Workout</button>
+    </div>
+  `;
+  container.querySelector('#begin-btn').addEventListener('click', async () => {
+    _startedAt = new Date();
+    _pausedElapsed = 0;
+    await renderActiveSession(container, plan);
+  });
 }
 
 async function resumeSession(container, active) {
@@ -135,6 +157,11 @@ async function renderActiveSession(container, plan) {
     <div class="session-header">
       <div class="session-elapsed" id="session-elapsed">0:00</div>
       <div class="session-day-name">Day ${plan.day_number || ''}: ${esc(plan.day_name || '')}</div>
+      <button class="btn btn-ghost btn-sm" id="pause-btn">⏸ Pause</button>
+    </div>
+    <div id="paused-overlay" style="display:none" class="paused-overlay">
+      <div class="paused-label">⏸ Paused</div>
+      <button class="btn btn-primary" id="resume-btn">▶ Resume</button>
     </div>
     <div id="exercise-cards">
       ${exercises.map(ex => renderExerciseCard(ex, lastSetsMap[ex.exercise_id] || [], plan.session_id)).join('')}
@@ -150,6 +177,10 @@ async function renderActiveSession(container, plan) {
   // Wire up exercise cards
   wireExerciseCards(container, plan.session_id);
 
+  // Pause / Resume
+  container.querySelector('#pause-btn').addEventListener('click', () => pauseWorkout(container));
+  container.querySelector('#resume-btn').addEventListener('click', () => resumeWorkout(container));
+
   // Finish button
   container.querySelector('#finish-btn').addEventListener('click', () => showFinishModal(plan.session_id));
 
@@ -160,12 +191,35 @@ async function renderActiveSession(container, plan) {
 function startElapsedTimer() {
   if (_elapsedTimer) clearInterval(_elapsedTimer);
   _elapsedTimer = setInterval(() => {
+    if (_paused) return;
     const el = document.getElementById('session-elapsed');
     if (el && _startedAt) {
-      const secs = Math.floor((Date.now() - _startedAt.getTime()) / 1000);
+      const secs = Math.floor((_pausedElapsed + Date.now() - _startedAt.getTime()) / 1000);
       el.textContent = formatDuration(secs);
     }
   }, 1000);
+}
+
+function pauseWorkout(container) {
+  if (_paused) return;
+  _paused = true;
+  _pausedElapsed += Date.now() - (_startedAt?.getTime() || Date.now());
+  _startedAt = null;
+  if (_restTimer) { _restTimer.destroy(); _restTimer = null; }
+  const overlay = document.getElementById('paused-overlay');
+  if (overlay) overlay.style.display = 'flex';
+  const pauseBtn = document.getElementById('pause-btn');
+  if (pauseBtn) pauseBtn.style.display = 'none';
+}
+
+function resumeWorkout(container) {
+  if (!_paused) return;
+  _paused = false;
+  _startedAt = new Date();
+  const overlay = document.getElementById('paused-overlay');
+  if (overlay) overlay.style.display = 'none';
+  const pauseBtn = document.getElementById('pause-btn');
+  if (pauseBtn) pauseBtn.style.display = '';
 }
 
 function renderExerciseCard(ex, lastSets, sessionId) {

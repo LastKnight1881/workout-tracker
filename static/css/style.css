@@ -212,7 +212,11 @@ input[type=number]::-webkit-inner-spin-button { display: none; }
    Session Page
    ===================== */
 .session-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 16px;
+  gap: 8px;
 }
 .session-elapsed {
   font-size: 1.8rem;
@@ -336,6 +340,136 @@ input[type=number]::-webkit-inner-spin-button { display: none; }
 .day-card-name { font-weight: 700; font-size: 1rem; }
 .day-card-exercises { font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; }
 
+/* ──── Ready screen ──────────────────────────────── */
+.ready-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 48px 24px;
+  text-align: center;
+}
+.ready-day-name {
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+.ready-meta {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+.btn-lg {
+  font-size: 1.1rem;
+  padding: 14px 40px;
+}
+/* ──── Paused overlay ────────────────────────────── */
+.paused-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 32px;
+  background: rgba(0,0,0,0.6);
+  border-radius: 12px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.paused-label {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-secondary);
+}
+/* ──── Charts ────────────────────────────────────── */
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+.tab-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  padding: 6px 14px;
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+}
+.tab-btn.active {
+  color: var(--accent);
+  font-weight: 700;
+  border-bottom: 2px solid var(--accent);
+}
+.charts-controls {
+  margin-bottom: 16px;
+}
+.chart-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.chart-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+}
+/* ──── History detail ────────────────────────────── */
+.history-item {
+  border-bottom: 1px solid var(--border);
+}
+.history-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  cursor: pointer;
+}
+.history-date {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.history-day {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.history-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.history-detail {
+  padding-bottom: 12px;
+}
+.history-exercise {
+  margin-bottom: 10px;
+}
+.history-exercise-name {
+  font-weight: 700;
+  font-size: 0.88rem;
+  margin-bottom: 4px;
+}
+.history-set-row {
+  display: flex;
+  gap: 12px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  padding: 2px 0;
+}
+.warmup-badge {
+  background: var(--border);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  padding: 0 5px;
+  font-size: 0.75rem;
+}
 .finish-bar {
   position: sticky;
   bottom: calc(var(--nav-height) + 8px);
@@ -478,6 +612,36 @@ input[type=number]::-webkit-inner-spin-button { display: none; }
 }
 .home-routine-name { font-size: 1.1rem; font-weight: 800; }
 .home-day-cycle { font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px; }
+.home-day-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+.home-day-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 10px 8px;
+  text-align: center;
+  line-height: 1.2;
+  min-height: 56px;
+}
+.home-day-btn .day-num {
+  font-size: 0.7rem;
+  opacity: 0.7;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.home-day-btn .day-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: normal;
+  word-break: break-word;
+}
 .recent-session-row {
   display: flex;
   align-items: center;
