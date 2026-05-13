@@ -55,6 +55,7 @@ export function startSession(dayId, routineId) {
   return request('POST', '/api/sessions/start', { day_id: dayId, routine_id: routineId });
 }
 export function getSession(id) { return request('GET', `/api/sessions/${id}`); }
+export function getSessionPlan(id) { return request('GET', `/api/sessions/${id}/plan`); }
 export function updateSession(id, data) { return request('PUT', `/api/sessions/${id}`, data); }
 export function finishSession(id, data) { return request('POST', `/api/sessions/${id}/finish`, data); }
 export function logSet(sessionId, data) { return request('POST', `/api/sessions/${sessionId}/sets`, data); }

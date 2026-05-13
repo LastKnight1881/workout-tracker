@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, Text, Float, ForeignKey, UniqueConstraint
+from sqlalchemy.orm import relationship
 from app.database import Base
 
 
@@ -13,6 +14,13 @@ class Routine(Base):
     created_at = Column(Text, nullable=False, server_default="(datetime('now'))")
     updated_at = Column(Text, nullable=False, server_default="(datetime('now'))")
 
+    days = relationship(
+        "RoutineDay",
+        back_populates="routine",
+        cascade="all, delete-orphan",
+        order_by="RoutineDay.day_number",
+    )
+
 
 class RoutineDay(Base):
     """A numbered day within a routine (e.g. Day 1 - Push A)."""
@@ -24,6 +32,14 @@ class RoutineDay(Base):
     name = Column(Text)
 
     __table_args__ = (UniqueConstraint("routine_id", "day_number"),)
+
+    routine = relationship("Routine", back_populates="days")
+    exercises = relationship(
+        "RoutineDayExercise",
+        back_populates="day",
+        cascade="all, delete-orphan",
+        order_by="RoutineDayExercise.sort_order",
+    )
 
 
 class RoutineDayExercise(Base):
@@ -38,3 +54,6 @@ class RoutineDayExercise(Base):
     target_reps = Column(Text)  # comma-separated: "8,8,8,12" — NOT default_reps
     default_weight = Column(Float)  # NULL = bodyweight
     notes = Column(Text)
+
+    day = relationship("RoutineDay", back_populates="exercises")
+    exercise = relationship("Exercise")

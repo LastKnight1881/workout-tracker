@@ -3,7 +3,7 @@ Routine service — all business logic for routines, days, and day exercises.
 """
 from typing import List, Optional
 from datetime import datetime, timezone
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from fastapi import HTTPException
 
 from app.models.routine import Routine, RoutineDay, RoutineDayExercise
@@ -13,10 +13,14 @@ from app.schemas.routine import (
     RoutineDayExerciseCreate, RoutineDayExerciseUpdate,
 )
 
+_ROUTINE_OPTIONS = [
+    selectinload(Routine.days).selectinload(RoutineDay.exercises).selectinload(RoutineDayExercise.exercise)
+]
+
 
 def list_routines(db: Session):
-    """Return all routines."""
-    return db.query(Routine).order_by(Routine.id).all()
+    """Return all routines with days and exercises eagerly loaded."""
+    return db.query(Routine).options(*_ROUTINE_OPTIONS).order_by(Routine.id).all()
 
 
 def create_routine(db: Session, data: RoutineCreate) -> Routine:
@@ -64,7 +68,7 @@ def activate_routine(db: Session, routine_id: int) -> Routine:
 
 def get_active_routine(db: Session) -> Routine:
     """Return active routine with days+exercises nested. Raises 404 if none active."""
-    routine = db.query(Routine).filter(Routine.is_active == 1).first()
+    routine = db.query(Routine).options(*_ROUTINE_OPTIONS).filter(Routine.is_active == 1).first()
     if not routine:
         raise HTTPException(status_code=404, detail="No active routine")
     return routine
@@ -72,7 +76,7 @@ def get_active_routine(db: Session) -> Routine:
 
 def get_routine(db: Session, routine_id: int) -> Routine:
     """Get routine by id."""
-    routine = db.query(Routine).filter(Routine.id == routine_id).first()
+    routine = db.query(Routine).options(*_ROUTINE_OPTIONS).filter(Routine.id == routine_id).first()
     if not routine:
         raise HTTPException(status_code=404, detail="Routine not found")
     return routine

@@ -31,6 +31,15 @@ def get_session(session_id: int, db: Session = Depends(get_db)):
     return session_service.get_session(db, session_id)
 
 
+@router.get("/{session_id}/plan")
+def get_session_plan(session_id: int, db: Session = Depends(get_db)):
+    """Return the planned exercises for the day associated with this session.
+    Each entry includes exercise name, muscle group, set_count, target_reps,
+    target_weight_lbs, and any already-logged sets for this session.
+    """
+    return session_service.get_session_plan(db, session_id)
+
+
 @router.put("/{session_id}", response_model=SessionRead)
 def update_session(session_id: int, data: SessionUpdate, db: Session = Depends(get_db)):
     return session_service.update_session(db, session_id, data)

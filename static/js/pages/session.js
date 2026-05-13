@@ -1,7 +1,7 @@
 // pages/session.js — Active Session (most complex page)
 
 import {
-  getActiveRoutine, getRoutine, startSession, getSession,
+  getActiveRoutine, getRoutine, startSession, getSession, getSessionPlan,
   logSet, finishSession, getLastSets
 } from '../api.js';
 import { formatWeight, parseWeight, formatDuration, showToast, openModal, closeModal } from '../utils.js';
@@ -95,8 +95,8 @@ async function startAndRender(container, dayId, routineId) {
     _sessionId = sess.id;
     _startedAt = new Date(sess.started_at);
     setActiveSession({ session_id: sess.id, started_at: sess.started_at, day_id: dayId, routine_id: routineId });
-    const full = await getSession(sess.id);
-    await renderActiveSession(container, full);
+    const plan = await getSessionPlan(sess.id);
+    await renderActiveSession(container, plan);
   } catch (e) {
     container.innerHTML = `<div class="empty-state"><h2>Error</h2><p>${e.message}</p></div>`;
     showToast(e.message, 'error');
@@ -108,21 +108,21 @@ async function resumeSession(container, active) {
   try {
     _sessionId = active.session_id;
     _startedAt = new Date(active.started_at);
-    const full = await getSession(active.session_id);
-    if (full.finished_at) {
+    const plan = await getSessionPlan(active.session_id);
+    if (plan.finished_at) {
       setActiveSession(null);
       window.location.hash = '#history';
       return;
     }
-    await renderActiveSession(container, full);
+    await renderActiveSession(container, plan);
   } catch (e) {
     container.innerHTML = `<div class="empty-state"><h2>Error</h2><p>${e.message}</p></div>`;
   }
 }
 
 // ─── Active Session Render ────────────────────────────────────────────────────
-async function renderActiveSession(container, session) {
-  const exercises = session.exercises || [];
+async function renderActiveSession(container, plan) {
+  const exercises = plan.exercises || [];
   // Fetch last sets for each exercise in parallel
   const lastSetsMap = {};
   await Promise.all(exercises.map(async ex => {
@@ -134,10 +134,10 @@ async function renderActiveSession(container, session) {
   container.innerHTML = `
     <div class="session-header">
       <div class="session-elapsed" id="session-elapsed">0:00</div>
-      <div class="session-day-name">${esc(session.day_name || '')}</div>
+      <div class="session-day-name">Day ${plan.day_number || ''}: ${esc(plan.day_name || '')}</div>
     </div>
     <div id="exercise-cards">
-      ${exercises.map(ex => renderExerciseCard(ex, lastSetsMap[ex.exercise_id] || [], session.id)).join('')}
+      ${exercises.map(ex => renderExerciseCard(ex, lastSetsMap[ex.exercise_id] || [], plan.session_id)).join('')}
     </div>
     <div class="finish-bar">
       <button class="btn btn-danger btn-block" id="finish-btn">Finish Workout</button>
@@ -148,10 +148,10 @@ async function renderActiveSession(container, session) {
   startElapsedTimer();
 
   // Wire up exercise cards
-  wireExerciseCards(container, session.id);
+  wireExerciseCards(container, plan.session_id);
 
   // Finish button
-  container.querySelector('#finish-btn').addEventListener('click', () => showFinishModal(session.id));
+  container.querySelector('#finish-btn').addEventListener('click', () => showFinishModal(plan.session_id));
 
   // Warn on navigate away
   window._sessionActive = true;
@@ -171,12 +171,20 @@ function startElapsedTimer() {
 function renderExerciseCard(ex, lastSets, sessionId) {
   const setCount = ex.set_count || 3;
   const targetReps = parseTargetReps(ex.target_reps, setCount);
+  const loggedBySetNum = {};
+  (ex.logged_sets || []).forEach(s => { loggedBySetNum[s.set_number] = s; });
+
   const rows = [];
   for (let i = 0; i < setCount; i++) {
+    const setNum = i + 1;
+    const logged = loggedBySetNum[setNum];
     const last = lastSets[i];
-    const prefillWeight = last ? last.weight_lbs : (ex.target_weight_lbs || '');
-    const prefillReps = last ? last.reps : (targetReps[i] || '');
-    rows.push(renderSetRow(i + 1, prefillWeight, prefillReps, targetReps[i] || ''));
+    // Priority: already logged this session > last session > plan default
+    const prefillWeight = logged ? logged.weight_lbs : (last ? last.weight : (ex.target_weight_lbs || ''));
+    const prefillReps = logged ? logged.reps : (last ? last.reps : (targetReps[i] || ''));
+    const isLogged = !!logged;
+    const isPR = logged?.is_pr;
+    rows.push(renderSetRow(setNum, prefillWeight, prefillReps, targetReps[i] || '', false, isLogged, isPR));
   }
   return `
     <div class="exercise-card" data-exercise-id="${ex.exercise_id}" data-session-id="${sessionId}">
@@ -195,17 +203,17 @@ function renderExerciseCard(ex, lastSets, sessionId) {
   `;
 }
 
-function renderSetRow(setNum, weight, reps, targetRep, warmup = false) {
+function renderSetRow(setNum, weight, reps, targetRep, warmup = false, logged = false, isPR = false) {
   const weightUnit = _prefs?.unit_system === 'metric' && weight
     ? (parseFloat(weight) * 0.453592).toFixed(1)
     : (weight || '');
   return `
-    <div class="target-label">${targetRep ? `Target: ${targetRep} reps` : ''}</div>
-    <div class="set-row${warmup ? ' warmup' : ''}" data-set-num="${setNum}">
+    <div class="target-label">${targetRep ? `Target: ${targetRep} reps` : ''}${isPR ? ' 🏆 PR' : ''}</div>
+    <div class="set-row${warmup ? ' warmup' : ''}${logged ? ' logged' : ''}" data-set-num="${setNum}">
       <span class="set-num">${setNum}</span>
       <input class="set-input weight-input" type="number" step="0.5" placeholder="lbs" value="${weightUnit}" min="0">
       <input class="set-input set-input-reps reps-input" type="number" placeholder="reps" value="${reps || ''}" min="0">
-      <button class="btn btn-ghost set-log-btn btn-sm">Log</button>
+      <button class="btn btn-ghost set-log-btn btn-sm${logged ? ' logged' : ''}">${logged ? '✓' : 'Log'}</button>
       <button class="btn btn-ghost set-warmup-btn btn-sm${warmup ? ' active' : ''}" title="Toggle warmup">W</button>
     </div>
   `;
@@ -285,9 +293,9 @@ function wireSetRow(row, sessionId, exerciseId, card) {
       const result = await logSet(sessionId, {
         exercise_id: exerciseId,
         set_number: setNum,
-        weight_lbs: weightLbs,
+        weight: weightLbs,
         reps,
-        is_warmup: isWarmup,
+        is_warmup: isWarmup ? 1 : 0,
       });
       row.classList.add('logged');
       logBtn.textContent = '✓';

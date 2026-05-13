@@ -113,6 +113,76 @@ def list_sessions(db: Session, limit: int = 20, offset: int = 0):
     )
 
 
+def get_session_plan(db: Session, session_id: int) -> list:
+    """
+    Return planned exercises for a session's day, enriched with:
+    - exercise name, muscle group
+    - set_count, target_reps, target_weight_lbs (from routine plan)
+    - logged sets already recorded for this session/exercise
+    """
+    from app.models.routine import RoutineDay, RoutineDayExercise
+    from app.models.exercise import Exercise as ExerciseModel
+
+    session = db.query(WorkoutSession).filter(WorkoutSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if session.day_id is None:
+        return []
+
+    rdes = (
+        db.query(RoutineDayExercise)
+        .filter(RoutineDayExercise.day_id == session.day_id)
+        .order_by(RoutineDayExercise.sort_order)
+        .all()
+    )
+
+    # Fetch day name
+    day = db.query(RoutineDay).filter(RoutineDay.id == session.day_id).first()
+
+    result = []
+    for rde in rdes:
+        ex = db.query(ExerciseModel).filter(ExerciseModel.id == rde.exercise_id).first()
+        # Logged sets for this exercise in this session
+        logged = (
+            db.query(SessionSet)
+            .filter(SessionSet.session_id == session_id, SessionSet.exercise_id == rde.exercise_id)
+            .order_by(SessionSet.set_number)
+            .all()
+        )
+        result.append({
+            "rde_id": rde.id,
+            "exercise_id": rde.exercise_id,
+            "exercise_name": ex.name if ex else "Unknown",
+            "muscle_group": ex.muscle_group if ex else "",
+            "equipment": ex.equipment if ex else "",
+            "set_count": rde.default_sets,
+            "target_reps": rde.target_reps,
+            "target_weight_lbs": rde.default_weight,
+            "logged_sets": [
+                {
+                    "id": s.id,
+                    "set_number": s.set_number,
+                    "weight_lbs": s.weight,
+                    "reps": s.reps,
+                    "is_warmup": s.is_warmup,
+                    "is_pr": s.is_pr,
+                }
+                for s in logged
+            ],
+        })
+
+    return {
+        "session_id": session_id,
+        "day_id": session.day_id,
+        "day_name": day.name if day else "",
+        "day_number": day.day_number if day else None,
+        "started_at": session.started_at,
+        "finished_at": session.finished_at,
+        "exercises": result,
+    }
+
+
 def get_session(db: Session, session_id: int) -> WorkoutSession:
     """Get session with all sets."""
     session = db.query(WorkoutSession).filter(WorkoutSession.id == session_id).first()
