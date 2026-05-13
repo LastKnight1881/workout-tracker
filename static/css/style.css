@@ -76,6 +76,8 @@ input[type=number]::-webkit-inner-spin-button { display: none; }
 .btn-danger:hover:not(:disabled) { background: #c53030; }
 .btn-ghost { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
 .btn-ghost:hover:not(:disabled) { background: var(--border); color: var(--text); }
+.btn-cancel { background: var(--card); color: var(--danger); border: 1px solid var(--danger); }
+.btn-cancel:hover:not(:disabled) { background: var(--danger); color: #fff; }
 .btn-success { background: var(--success); color: #000; }
 .btn-sm { padding: 6px 10px; font-size: 0.8rem; }
 .btn-icon { padding: 6px; background: transparent; color: var(--text-secondary); border: none; font-size: 1.1rem; }
