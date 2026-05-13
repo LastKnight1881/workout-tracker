@@ -72,7 +72,7 @@ input[type=number]::-webkit-inner-spin-button { display: none; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
-.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger { background: var(--danger); color: #fff; border: 1px solid transparent; }
 .btn-danger:hover:not(:disabled) { background: #c53030; }
 .btn-ghost { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
 .btn-ghost:hover:not(:disabled) { background: var(--border); color: var(--text); }
