@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workout Tracker</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <main id="app"></main>
+  <div id="rest-timer-bar" class="rest-timer-bar" style="display:none">
+    <div class="rest-timer-inner">
+      <span class="rest-timer-label">Rest</span>
+      <span id="rest-timer-display" class="rest-timer-display">0:00</span>
+      <div class="rest-timer-actions">
+        <button id="rest-timer-minus" class="btn btn-ghost btn-sm">-15s</button>
+        <button id="rest-timer-plus" class="btn btn-ghost btn-sm">+15s</button>
+        <button id="rest-timer-skip" class="btn btn-ghost btn-sm">Skip</button>
+      </div>
+    </div>
+  </div>
+  <nav id="nav-bar" class="nav-bar">
+    <a href="#home" class="nav-item" data-page="home">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">Home</span>
+    </a>
+    <a href="#session" class="nav-item" data-page="session">
+      <span class="nav-icon">💪</span>
+      <span class="nav-label">Workout</span>
+    </a>
+    <a href="#routines" class="nav-item" data-page="routines">
+      <span class="nav-icon">📋</span>
+      <span class="nav-label">Routines</span>
+    </a>
+    <a href="#exercises" class="nav-item" data-page="exercises">
+      <span class="nav-icon">🏋️</span>
+      <span class="nav-label">Exercises</span>
+    </a>
+    <a href="#history" class="nav-item" data-page="history">
+      <span class="nav-icon">📊</span>
+      <span class="nav-label">History</span>
+    </a>
+    <a href="#settings" class="nav-item" data-page="settings">
+      <span class="nav-icon">⚙️</span>
+      <span class="nav-label">Settings</span>
+    </a>
+  </nav>
+  <div id="modal-overlay" class="modal-overlay" style="display:none">
+    <div id="modal" class="modal"></div>
+  </div>
+  <script type="module" src="/static/js/app.js"></script>
+</body>
+</html>
